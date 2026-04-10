@@ -3,7 +3,7 @@
 ###
 
 <div align="center">
-<img src="https://github-readme-stats.vercel.app/api?username=yalkahaleh&show_icons=true&locale=en&theme=dracula" height="150" alt="GitHub stats" />
+<img src="https://github-readme-stats-sage-six-40.vercel.app/api?username=yalkahaleh&show_icons=true&theme=dracula" height="150" />
 </div>
 
 ###
