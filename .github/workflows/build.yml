@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, ccr-c5f2353d-wwk9ys]
   pull_request:
   workflow_dispatch:
 
@@ -29,10 +29,10 @@ jobs:
           path: masroof.apk
       # Keep one always-current download link for installing on the phone.
       - name: Publish to the "latest" release
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view latest >/dev/null 2>&1 || \
-            gh release create latest --prerelease --title "Latest build" --notes "Rebuilt on every push to main."
+            gh release create latest --prerelease --target "$GITHUB_SHA" --title "Masroof latest build" --notes "Rebuilt on every push."
           gh release upload latest masroof.apk --clobber
