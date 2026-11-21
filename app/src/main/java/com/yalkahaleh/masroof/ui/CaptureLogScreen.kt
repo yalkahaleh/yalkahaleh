@@ -242,7 +242,7 @@ private fun NotificationCard(item: CapturedNotification, onDelete: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (item.title.isNotBlank()) Text(item.title, style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(top = 6.dp, end = 12.dp))
-            val body = item.bigText.ifBlank { item.text }
+            val body = if (item.bigText.isBlank() || item.bigText.startsWith("--- raw ---")) listOf(item.text, item.bigText).filter { it.isNotBlank() }.joinToString("\n") else item.bigText
             if (body.isNotBlank()) Text(body, style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(end = 12.dp))
             if (item.subText.isNotBlank()) Text(item.subText, style = MaterialTheme.typography.bodySmall,

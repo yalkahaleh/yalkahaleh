@@ -1,6 +1,7 @@
 package com.yalkahaleh.masroof.capture
 
 import android.app.Notification
+import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.yalkahaleh.masroof.data.AppDatabase
@@ -35,9 +36,24 @@ class PaymentNotificationListener : NotificationListenerService() {
             ?.joinToString("\n").orEmpty()
         val body = bigText.ifBlank { lines }
 
-        val content = listOf(title, text, body, subText).joinToString("\n")
-        if (content.isBlank()) return
+        val ticker = n.tickerText?.toString().orEmpty()
+        val raw = rawDump(n, sbn)
+
+        // Some apps (banks especially) draw a custom notification and leave the
+        // standard title/text empty, so every readable field is searched.
+        val content = listOf(title, text, body, subText, ticker, raw).joinToString("\n")
         if (!CaptureFilter.shouldCapture(sbn.packageName, content, captureAll)) return
+
+        val standardEmpty = title.isBlank() && text.isBlank() && body.isBlank()
+        val details = buildString {
+            if (body != text) append(body)
+            // Keep the raw fields whenever they are the only evidence, or when
+            // the user asked to capture everything.
+            if (captureAll || standardEmpty) {
+                if (isNotEmpty()) append("\n")
+                append("--- raw ---\n").append(raw)
+            }
+        }
 
         val item = CapturedNotification(
             notificationKey = sbn.key,
@@ -45,7 +61,7 @@ class PaymentNotificationListener : NotificationListenerService() {
             appLabel = appLabel(sbn.packageName),
             title = title,
             text = text,
-            bigText = if (body == text) "" else body,
+            bigText = details,
             subText = subText,
             category = n.category.orEmpty(),
             postedAt = sbn.postTime,
@@ -61,6 +77,30 @@ class PaymentNotificationListener : NotificationListenerService() {
             }
         }
     }
+
+    /** Every text-like value the notification carries, for diagnosing odd formats. */
+    private fun rawDump(n: Notification, sbn: StatusBarNotification): String = buildString {
+        append("flags=0x").append(Integer.toHexString(n.flags))
+        append(" ongoing=").append(sbn.isOngoing)
+        append(" customView=").append(n.contentView != null || n.bigContentView != null)
+        append(" user=").append(sbn.user.hashCode()).append('\n')
+        n.tickerText?.let { append("ticker: ").append(it).append('\n') }
+        val extras = n.extras
+        for (key in extras.keySet().sorted()) {
+            @Suppress("DEPRECATION")
+            when (val v = runCatching { extras.get(key) }.getOrNull()) {
+                is CharSequence -> if (v.isNotBlank()) append(key).append(": ").append(v).append('\n')
+                is Array<*> -> v.forEach { e ->
+                    when (e) {
+                        is CharSequence -> append(key).append("[]: ").append(e).append('\n')
+                        is Bundle -> e.getCharSequence("text")?.let { t ->
+                            append(key).append("[].text: ").append(t).append('\n')
+                        }
+                    }
+                }
+            }
+        }
+    }.trim()
 
     private fun appLabel(pkg: String): String = try {
         packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
