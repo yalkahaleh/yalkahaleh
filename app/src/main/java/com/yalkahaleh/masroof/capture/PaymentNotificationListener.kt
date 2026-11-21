@@ -18,10 +18,13 @@ class PaymentNotificationListener : NotificationListenerService() {
     private val writeLock = Mutex()
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (sbn.packageName == packageName || sbn.isOngoing) return
+        if (sbn.packageName == packageName) return
         val n = sbn.notification ?: return
-        // Group summaries ("3 new messages") repeat what the child notifications say.
-        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        val captureAll = Prefs.captureAll(this)
+        // Ongoing notifications and group summaries ("3 new messages") are normally
+        // noise, but in capture-all mode nothing is skipped, so no payment
+        // notification can be dropped by this filter.
+        if (!captureAll && (sbn.isOngoing || n.flags and Notification.FLAG_GROUP_SUMMARY != 0)) return
 
         val extras = n.extras
         val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
@@ -34,7 +37,7 @@ class PaymentNotificationListener : NotificationListenerService() {
 
         val content = listOf(title, text, body, subText).joinToString("\n")
         if (content.isBlank()) return
-        if (!CaptureFilter.shouldCapture(sbn.packageName, content, Prefs.captureAll(this))) return
+        if (!CaptureFilter.shouldCapture(sbn.packageName, content, captureAll)) return
 
         val item = CapturedNotification(
             notificationKey = sbn.key,

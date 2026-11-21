@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
+import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -45,6 +46,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yalkahaleh.masroof.capture.LogExport
 import com.yalkahaleh.masroof.capture.Prefs
+import com.yalkahaleh.masroof.capture.SmsInboxScanner
 import com.yalkahaleh.masroof.data.AppDatabase
 import com.yalkahaleh.masroof.data.CapturedNotification
 import kotlinx.coroutines.Dispatchers
@@ -86,6 +88,23 @@ fun CaptureLogScreen() {
             }
             Toast.makeText(context, if (saved) "Log saved" else "Could not save the log", Toast.LENGTH_LONG).show()
         }
+    }
+
+    fun scanSms() = scope.launch {
+        val result = withContext(Dispatchers.IO) { runCatching { SmsInboxScanner.scan(context, captureAll) } }
+        val message = result.fold(
+            onSuccess = { "Read ${it.read} SMS from the last 30 days, added ${it.added}" },
+            onFailure = { "Could not read SMS: ${it.message}" },
+        )
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+    }
+    val askSms = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) scanSms()
+        else Toast.makeText(
+            context,
+            "SMS permission denied. Allow it in App info > Permissions, then try again.",
+            Toast.LENGTH_LONG,
+        ).show()
     }
 
     Scaffold(
@@ -141,6 +160,19 @@ fun CaptureLogScreen() {
                         captureAll = it
                         Prefs.setCaptureAll(context, it)
                     })
+                }
+            }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    OutlinedButton(onClick = { askSms.launch(Manifest.permission.READ_SMS) }) {
+                        Text("Scan SMS inbox")
+                    }
+                    Text(
+                        "Reads text messages already on the phone from the last 30 days and adds the " +
+                            "ones that mention money. Use this if your bank sends an SMS per payment.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             item {
